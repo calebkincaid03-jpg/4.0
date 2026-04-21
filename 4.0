@@ -1,0 +1,161 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import json
+import os
+
+st.set_page_config(page_title="AI Stock Scanner Pro", layout="wide")
+
+# -------------------------
+# LOAD / SAVE PERFORMANCE DATA
+# -------------------------
+DATA_FILE = "scanner_results.json"
+
+
+def load_results():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    return []
+
+
+def save_results(results):
+    with open(DATA_FILE, "w") as f:
+        json.dump(results, f)
+
+
+results = load_results()
+
+# -------------------------
+# SELF-LEARNING WEIGHTS
+# -------------------------
+base_weights = {"rsi": 10, "volume": 15, "vwap": 10, "trend": 10, "momentum": 10}
+
+if len(results) > 5:
+    wins = [r for r in results if r["outcome"] == "win"]
+    if len(wins) > 0:
+        base_weights["volume"] += 3
+        base_weights["trend"] += 2
+
+
+# -------------------------
+# AI CONFIDENCE SCORE
+# -------------------------
+def ai_score(rsi, volume_ratio, above_vwap, trend_strength, momentum):
+    score = 50
+
+    if 55 <= rsi <= 70:
+        score += base_weights["rsi"]
+
+    score += min(volume_ratio * 5, base_weights["volume"])
+
+    if above_vwap:
+        score += base_weights["vwap"]
+
+    score += trend_strength * base_weights["trend"]
+    score += momentum * base_weights["momentum"]
+
+    return max(1, min(99, round(score)))
+
+
+# -------------------------
+# SAMPLE LIVE ALERTS
+# -------------------------
+alerts = [
+    {
+        "ticker": "TSLA",
+        "type": "Breakout",
+        "rsi": 63,
+        "volume": 2.3,
+        "vwap": True,
+        "trend": 0.8,
+        "momentum": 0.7,
+    },
+    {
+        "ticker": "NVDA",
+        "type": "Reversal",
+        "rsi": 44,
+        "volume": 1.5,
+        "vwap": True,
+        "trend": 0.5,
+        "momentum": 0.4,
+    },
+    {
+        "ticker": "SPY",
+        "type": "Momentum",
+        "rsi": 59,
+        "volume": 1.9,
+        "vwap": True,
+        "trend": 0.7,
+        "momentum": 0.6,
+    },
+]
+
+# -------------------------
+# UI
+# -------------------------
+st.title("🚀 AI Stock Scanner Pro")
+
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.subheader("Live Alerts")
+
+    for alert in alerts:
+        confidence = ai_score(
+            alert["rsi"],
+            alert["volume"],
+            alert["vwap"],
+            alert["trend"],
+            alert["momentum"],
+        )
+
+        if confidence >= 80:
+            badge = "🟢 STRONG"
+        elif confidence >= 65:
+            badge = "🟡 MEDIUM"
+        else:
+            badge = "🔴 WEAK"
+
+        st.markdown(f"### {alert['ticker']} - {alert['type']}")
+        st.metric("Confidence", f"{confidence}%")
+        st.write(badge)
+
+        if confidence >= 80:
+            st.success(f"🔥 Push Alert: {alert['ticker']} High Probability Setup!")
+
+        outcome = st.selectbox(
+            f"Mark Result {alert['ticker']}",
+            ["pending", "win", "loss"],
+            key=alert["ticker"],
+        )
+
+        if st.button(f"Save {alert['ticker']}", key=f"btn{alert['ticker']}"):
+            results.append(
+                {
+                    "ticker": alert["ticker"],
+                    "confidence": confidence,
+                    "outcome": outcome,
+                }
+            )
+            save_results(results)
+            st.success("Saved")
+
+        st.divider()
+
+with col2:
+    st.subheader("Performance Dashboard")
+
+    total = len(results)
+    wins = len([r for r in results if r["outcome"] == "win"])
+    losses = len([r for r in results if r["outcome"] == "loss"])
+
+    win_rate = round((wins / total) * 100, 1) if total > 0 else 0
+
+    st.metric("Total Trades", total)
+    st.metric("Wins", wins)
+    st.metric("Losses", losses)
+    st.metric("Win Rate", f"{win_rate}%")
+
+    if total > 5:
+        st.success("AI Learning Active")

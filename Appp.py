@@ -1,41 +1,32 @@
-# Assuming this is a Python file that contains relevant imports and a main block
+# Corrected Appp.py code
+
+# Updated Scatter traces and safe RSI calculation
 
 import yfinance as yf
-import matplotlib.pyplot as plt
 
-# Sample code with modifications made
+# Sample Function to calculate RSI safely
 
-# Function to plot with Scatter traces
+def calculate_rsi(data, period=14):
+    delta = data['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss.replace(0, 1e-10)  # Avoid division by zero
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
 
-def plot_data(data):
-    traces = []
-    for series in data:
-        trace = {
-            'x': series['x'],
-            'y': series['y'],
-            'type': 'scatter',
-            'mode': 'lines',  # Added mode="lines"
-            'name': series['name']
-        }
-        traces.append(trace)
-    # Code to call the plotting function
+# Example usage of yfinance with progress set to False
 
-# Fixing RSI division by zero error with conditional logic
+def fetch_data(ticker):
+    data = yf.download(ticker, progress=False)
+    data['RSI'] = calculate_rsi(data)
+    return data
 
-def calculate_rsi(prices):
-    if len(prices) < 2:
-        return None  # Avoid division by zero
-    # RSI calculation logic goes here
+# Example scatter plot usage
 
-# Adding progress=False to yfinance calls
+import plotly.express as px
 
-def get_data(ticker):
-    try:
-        data = yf.download(ticker, progress=False)  # Added progress=False
-        return data
-    except Exception as e:
-        print(f'Error retrieving data for {ticker}: {str(e)}')  # Improved error message for invalid ticker
+# Scatter plot with updated mode
 
-# Example function call
-# data = get_data('AAPL')
-# plot_data(data)
+def create_plot(data):
+    fig = px.scatter(data, x='Date', y='RSI', mode='lines')  # mode set to lines for Scatter
+    fig.show()
